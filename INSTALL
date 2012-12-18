@@ -1,10 +1,10 @@
 * Prerequisites
-  
-  1. Make sure you have bison (http://www.gnu.org/software/bison/) installed in your system. 
+
+  1. Make sure you have bison (http://www.gnu.org/software/bison/) installed in your system.
 
 * Compilation and Installation
 
-  1. Run make in the top directory.
+  1. Run `rake` in the top directory.
 
      This command will create the following directories and
      store libraries and binaries files into them.
