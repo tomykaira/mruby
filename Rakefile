@@ -97,6 +97,12 @@ task :all => depfiles do
   end
 end
 
+desc "build my additional programs"
+task :mine do
+  system("cd examples/mine; make")
+  system("cd examples/mine; make run")
+end
+
 desc "run all mruby tests"
 task :test => MRuby.targets.values.map { |t| t.build_mrbtest_lib_only? ? t.libfile("#{t.build_dir}/test/mrbtest") : t.exefile("#{t.build_dir}/test/mrbtest") } do
   MRuby.each_target do
