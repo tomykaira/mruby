@@ -2103,6 +2103,11 @@ primary		: literal
 		  bodystmt
 		  keyword_end
 		    {
+		      /* cpath =
+		           ::Name -> (1 . Name)
+		           Name -> (0 . Name)
+		           Parent::Child -> (Parent . Child)
+		       */
 		      $$ = new_class(p, $2, $3, $5);
 		      local_resume(p, $<nd>4);
 		    }

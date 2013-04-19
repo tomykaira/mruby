@@ -160,8 +160,8 @@ genop_peep(codegen_scope *s, mrb_code i, int val)
   /* peephole optimization */
   if (s->lastlabel != s->pc && s->pc > 0) {
     mrb_code i0 = s->iseq[s->pc-1];
-    int c1 = GET_OPCODE(i);
-    int c0 = GET_OPCODE(i0);
+    int c1 = GET_OPCODE(i); /* current opcode */
+    int c0 = GET_OPCODE(i0); /* last opcode */
 
     switch (c1) {
     case OP_MOVE:
@@ -630,6 +630,7 @@ lambda_body(codegen_scope *s, node *tree, int blk)
       codegen(s, opt->car->cdr, VAL);
       idx = lv_idx(s, (mrb_sym)(intptr_t)opt->car->car);
       pop();
+      /* this MOVE is skipped, if opt arg is provided */
       genop_peep(s, MKOP_AB(OP_MOVE, idx, cursp()), NOVAL);
       i++;
       opt = opt->cdr;
@@ -800,6 +801,10 @@ gen_call(codegen_scope *s, node *tree, mrb_sym name, int sp, int val)
     size_t len;
     const char *name = mrb_sym2name_len(s->mrb, sym, &len);
 
+    /*
+      記号類は、その関数が override されているかに関係なく特殊命令をつくる
+      現状 override しても意味がない!
+     */
     if (!noop && len == 1 && name[0] == '+')  {
       genop_peep(s, MKOP_ABC(OP_ADD, cursp(), idx, n), val);
     }
@@ -2244,6 +2249,7 @@ codegen(codegen_scope *s, node *tree, int val)
         push();
       }
       else if (tree->car->car == (node*)1) {
+        /* Object class */
         genop(s, MKOP_A(OP_OCLASS, cursp()));
         push();
       }
@@ -2260,6 +2266,7 @@ codegen(codegen_scope *s, node *tree, int val)
       pop(); pop();
       idx = new_msym(s, sym(tree->car->cdr));
       genop(s, MKOP_AB(OP_CLASS, cursp(), idx));
+      /* あたらしい irep を追加して、そこに中身を実装する */
       idx = scope_body(s, tree->cdr->cdr->car);
       genop(s, MKOP_ABx(OP_EXEC, cursp(), idx));
       if (val) {
@@ -2314,10 +2321,12 @@ codegen(codegen_scope *s, node *tree, int val)
       int sym = new_msym(s, sym(tree->car));
       int idx = lambda_body(s, tree->cdr, 0);
 
+      /* 操作対象の class は VM が mrb->ci->target_class に OP_EXEC で設定する */
       genop(s, MKOP_A(OP_TCLASS, cursp()));
       push();
       genop(s, MKOP_Abc(OP_LAMBDA, cursp(), idx, OP_L_METHOD));
       pop();
+      /* 規約: 本体の LAMBDA は cursp() + 1 にある */
       genop(s, MKOP_AB(OP_METHOD, cursp(), sym));
       if (val) {
         genop(s, MKOP_A(OP_LOADNIL, cursp()));
@@ -2355,6 +2364,8 @@ codegen(codegen_scope *s, node *tree, int val)
   }
 }
 
+// prev は上のスコープ
+// lv = local variable
 static codegen_scope*
 scope_new(mrb_state *mrb, codegen_scope *prev, node *lv)
 {
@@ -2387,6 +2398,14 @@ scope_new(mrb_state *mrb, codegen_scope *prev, node *lv)
 
   p->lv = lv;
   p->sp += node_len(lv)+1;        /* add self */
+  /*
+    ---------------
+    local variables
+    ---------------
+    self
+    ---------------
+    stack
+   */
   p->nlocals = p->sp;
   p->ai = mrb_gc_arena_save(mrb);
 
@@ -2398,6 +2417,7 @@ scope_new(mrb_state *mrb, codegen_scope *prev, node *lv)
   return p;
 }
 
+// scope の変更を終える。 scope をもとに irep を更新する。
 static void
 scope_finish(codegen_scope *s)
 {
