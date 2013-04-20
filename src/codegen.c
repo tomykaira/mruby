@@ -1177,13 +1177,17 @@ codegen(codegen_scope *s, node *tree, int val)
             }
           } while (n4);
           pos1 = new_label(s);
+          /* ハンドルされない例外のための block へ */
           genop(s, MKOP_sBx(OP_JMP, 0));
+          /* あとから連続 JMP を一箇所への JMP につなげる */
           dispatch_linked(s, pos2);
 
           pop();
+          /* e への束縛 */
           if (n3->cdr->car) {
             gen_assignment(s, n3->cdr->car, exc, NOVAL);
           }
+          /* 本体 */
           if (n3->cdr->cdr->car) {
             codegen(s, n3->cdr->cdr->car, val);
             if (val) pop();
@@ -1202,7 +1206,9 @@ codegen(codegen_scope *s, node *tree, int val)
       pop();
       tree = tree->cdr;
       dispatch(s, noexc);
+      /* RESCUE がおこなわれた場合は POP しない。 RESCUE の処理内で自然に POP (vm.c:1243) */
       genop(s, MKOP_A(OP_POPERR, 1));
+      /* else block */
       if (tree->car) {
         codegen(s, tree->car, val);
       }
